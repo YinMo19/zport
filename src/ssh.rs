@@ -38,10 +38,12 @@ pub fn resolve_port(remote: u16, local: Option<u16>) -> u16 {
         }
         return l;
     }
+
     let mut p = remote;
     while !port_free(p) {
         p += 1;
     }
+
     if p != remote {
         eprintln!("warning: localhost:{remote} in use, using localhost:{p}");
     }
@@ -136,6 +138,7 @@ pub fn ensure_master(host: &str, port: u16) {
     if master_alive(host, port) {
         return;
     }
+
     // Stale socket from a dead session blocks a fresh one — remove it.
     let sock = state::sock_path(host);
     if sock.exists() {
@@ -157,12 +160,14 @@ pub fn ensure_master(host: &str, port: u16) {
         std::process::exit(1);
     });
 
+    // Poll up to 5 s for the master to come alive.
     for _ in 0..50 {
         thread::sleep(Duration::from_millis(100));
         if master_alive(host, port) {
             return;
         }
     }
+
     let detail = match child.try_wait() {
         Ok(Some(s)) => format!(" (ssh exited with code {s})"),
         Ok(None) => " (still running after 5 s timeout)".into(),
@@ -174,11 +179,13 @@ pub fn ensure_master(host: &str, port: u16) {
 
 // Fallback: start an independent `ssh -L` background process. No BatchMode — the user
 // may need to type a password. On Windows, `-f` backgrounds after auth and we poll
-// netstat for the real PID. On Unix we detach via null stdio + start_new_session.
+// netstat for the real PID. On Unix we detach via null stdio.
 pub fn spawn_forward(host: &str, port: u16, local: u16, remote: u16) -> u32 {
     let mut c = ssh_base(port);
+
     #[cfg(windows)]
     c.arg("-f");
+
     c.args(["-L", &format!("{local}:localhost:{remote}"), "-N", host]);
 
     #[cfg(windows)]
@@ -188,6 +195,7 @@ pub fn spawn_forward(host: &str, port: u16, local: u16, remote: u16) -> u32 {
             eprintln!("error: failed to start ssh: {e}");
             std::process::exit(1);
         });
+
         for _ in 0..60 {
             thread::sleep(Duration::from_millis(500));
             if let Some(pid) = find_listening_pid(local) {
@@ -203,10 +211,12 @@ pub fn spawn_forward(host: &str, port: u16, local: u16, remote: u16) -> u32 {
         c.stdin(Stdio::null());
         c.stdout(Stdio::null());
         c.stderr(Stdio::null());
+
         let mut child = c.spawn().unwrap_or_else(|e| {
             eprintln!("error: failed to start ssh: {e}");
             std::process::exit(1);
         });
+
         thread::sleep(Duration::from_millis(500));
         if let Ok(Some(s)) = child.try_wait() {
             eprintln!("error: forward failed (ssh exited with code {s})");
@@ -221,6 +231,7 @@ fn find_listening_pid(local: u16) -> Option<u32> {
     let target = format!("127.0.0.1:{local}");
     let out = Command::new("netstat").args(["-ano"]).output().ok()?;
     let stdout = String::from_utf8_lossy(&out.stdout);
+
     for line in stdout.lines() {
         if line.contains(&target) && line.contains("LISTENING") {
             return line.split_whitespace().last()?.parse().ok();

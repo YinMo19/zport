@@ -23,6 +23,7 @@ pub fn connect(host: &str, ssh_port: u16) {
 
 pub fn forward(host: Option<&str>, ssh_port: Option<u16>, remote: u16, local: Option<u16>) {
     let mut state = state::load();
+
     let host = host
         .map(|s| s.to_string())
         .or_else(|| state.default_host.clone())
@@ -30,14 +31,17 @@ pub fn forward(host: Option<&str>, ssh_port: Option<u16>, remote: u16, local: Op
             eprintln!("error: no host configured.  Run 'zport <host>' first.");
             std::process::exit(1);
         });
+
     let port = ssh_port
         .or_else(|| state.ports.get(&host).copied())
         .unwrap_or(22);
+
     let local = ssh::resolve_port(remote, local);
 
     // Two code paths: ControlMaster multiplexing (Linux/macOS) vs individual `ssh -L` (Windows).
     if ssh::cm_available() {
         ssh::ensure_master(&host, port);
+
         let mut c = ssh::ssh_cm(&host, port);
         c.args([
             "-O",
@@ -47,15 +51,18 @@ pub fn forward(host: Option<&str>, ssh_port: Option<u16>, remote: u16, local: Op
         ]);
         c.stdout(Stdio::null());
         c.stderr(Stdio::piped());
+
         let out = c.output().unwrap_or_else(|e| {
             eprintln!("error: ssh failed: {e}");
             std::process::exit(1);
         });
+
         if !out.status.success() {
             let msg = String::from_utf8_lossy(&out.stderr);
             eprintln!("error: forward failed: {msg}", msg = msg.trim());
             std::process::exit(1);
         }
+
         state
             .hosts
             .entry(host.clone())
@@ -75,18 +82,22 @@ pub fn forward(host: Option<&str>, ssh_port: Option<u16>, remote: u16, local: Op
     }
     state.default_host = Some(host.clone());
     state::save(&state);
+
     println!("✓ :{local} → :{remote} on {host}");
 }
 
 pub fn list() {
     let state = state::load();
     let hosts = &state.hosts;
+
     if hosts.is_empty() {
         println!("no active forwards");
         return;
     }
+
     for (host, forwards) in hosts {
         let port = state.ports.get(host).copied().unwrap_or(22);
+
         let alive = if ssh::cm_available() {
             ssh::master_alive(host, port)
         } else {
@@ -94,15 +105,18 @@ pub fn list() {
                 .values()
                 .any(|e| e.pid().is_some_and(ssh::pid_alive))
         };
+
         let label = if port == 22 {
             host.clone()
         } else {
             format!("{host}:{port}")
         };
+
         println!(
             "{label} ({})",
             if alive { "connected" } else { "disconnected" }
         );
+
         let mut sorted: Vec<_> = forwards.iter().collect();
         sorted.sort_by_key(|(k, _)| k.parse::<u16>().unwrap_or(0));
         println!("  {:>10}  REMOTE", "LOCAL");
@@ -115,6 +129,7 @@ pub fn list() {
 
 pub fn close(host: Option<&str>, local_port: u16) {
     let mut state = state::load();
+
     let host = host
         .or(state.default_host.as_deref())
         .unwrap_or_else(|| {
@@ -147,7 +162,9 @@ pub fn close(host: Option<&str>, local_port: u16) {
 
         // Best-effort: the connection may already be dead, so a failed cancel is not fatal.
         if !c.status().map(|s| s.success()).unwrap_or(false) {
-            eprintln!("warning: could not cancel on {host} (connection lost?), cleaning up state");
+            eprintln!(
+                "warning: could not cancel on {host} (connection lost?), cleaning up state"
+            );
         }
     } else if let Some(pid) = entry.pid() {
         ssh::kill_pid(pid);
@@ -157,11 +174,13 @@ pub fn close(host: Option<&str>, local_port: u16) {
         state.hosts.remove(&host);
     }
     state::save(&state);
+
     println!("✓ closed :{local_port} on {host}");
 }
 
 pub fn disconnect(host: Option<&str>) {
     let mut state = state::load();
+
     let host = host
         .or(state.default_host.as_deref())
         .unwrap_or_else(|| {
@@ -186,12 +205,14 @@ pub fn disconnect(host: Option<&str>) {
             c.stderr(Stdio::null());
             c.status().ok();
         }
+
         // Tell the ControlMaster to shut down, then remove its socket.
         let mut c = ssh::ssh_cm(&host, port);
         c.args(["-O", "exit"]);
         c.stdout(Stdio::null());
         c.stderr(Stdio::null());
         c.status().ok();
+
         let sock = state::sock_path(&host);
         if sock.exists() {
             let _ = std::fs::remove_file(&sock);
@@ -208,5 +229,6 @@ pub fn disconnect(host: Option<&str>) {
         state.default_host = None;
     }
     state::save(&state);
+
     println!("✓ disconnected from {host}");
 }

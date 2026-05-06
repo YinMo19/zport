@@ -7,9 +7,11 @@ use serde::{Deserialize, Serialize};
 pub fn zport_dir() -> PathBuf {
     home::home_dir().unwrap_or_default().join(".zport")
 }
+
 pub fn state_path() -> PathBuf {
     zport_dir().join("state.json")
 }
+
 pub fn sock_path(host: &str) -> PathBuf {
     zport_dir().join(format!("mux-{host}"))
 }
@@ -37,6 +39,7 @@ impl Entry {
             Entry::Cm { remote } | Entry::Proc { remote, .. } => *remote,
         }
     }
+
     pub fn pid(&self) -> Option<u32> {
         match self {
             Entry::Proc { pid, .. } => Some(*pid),

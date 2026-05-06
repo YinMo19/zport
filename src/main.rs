@@ -46,6 +46,7 @@ fn parse_port_spec(spec: &str) -> Option<(u16, Option<u16>)> {
 // Map positional shorthand to subcommand args: `zport 8080` → `zport forward 8080`.
 fn map_positional(args: &[String]) -> Vec<String> {
     let mut out = vec!["zport".into()];
+
     match args.len() {
         1 => {
             let a = &args[0];
@@ -74,12 +75,14 @@ fn map_positional(args: &[String]) -> Vec<String> {
             std::process::exit(1);
         }
     }
+
     out
 }
 
 fn main() {
     let raw: Vec<String> = std::env::args().collect();
     let known = ["connect", "forward", "ls", "close", "disconnect", "help"];
+
     let cli = if raw.len() > 1 && !known.contains(&raw[1].as_str()) && !raw[1].starts_with('-') {
         Cli::parse_from(map_positional(&raw[1..]))
     } else {
@@ -103,6 +106,7 @@ fn main() {
                 })
                 .unzip();
             let host = host.flatten();
+
             if let Some((remote, local)) = parse_port_spec(&port_spec) {
                 cmd::forward(host, ssh_port.flatten(), remote, local);
             } else if let Ok(remote) = port_spec.parse() {
