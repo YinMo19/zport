@@ -26,6 +26,12 @@ State is stored in `~/.zport/state.json`.
 ## Install
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/YinMo19/zport/refs/heads/master/install.sh | sh
+```
+
+Or via cargo:
+
+```bash
 cargo install --git https://github.com/YinMo19/zport
 ```
 
