@@ -4,8 +4,6 @@ set -eu
 REPO="YinMo19/zport"
 BIN="zport"
 
-# ── Detect OS & architecture ────────────────────────────────────────
-
 OS=$(uname -s)
 ARCH=$(uname -m)
 
@@ -29,24 +27,12 @@ esac
 
 TARGET="${goarch}-${goos}"
 
-# ── Resolve version ─────────────────────────────────────────────────
-
 VERSION="${1:-latest}"
-
 if [ "$VERSION" = "latest" ]; then
-    echo "Fetching latest release..."
-    VERSION=$(curl -sSL "https://api.github.com/repos/$REPO/releases/latest" \
-        | grep '"tag_name"' | head -1 \
-        | sed 's/.*"tag_name": *"\(.*\)".*/\1/')
-    if [ -z "$VERSION" ]; then
-        echo "error: could not determine latest version" >&2
-        exit 1
-    fi
+    URL="https://github.com/$REPO/releases/latest/download/${BIN}-${TARGET}.tar.gz"
+else
+    URL="https://github.com/$REPO/releases/download/${VERSION}/${BIN}-${TARGET}.tar.gz"
 fi
-
-# ── Download & install ──────────────────────────────────────────────
-
-URL="https://github.com/$REPO/releases/download/${VERSION}/${BIN}-${TARGET}.tar.gz"
 
 echo "Downloading $BIN $VERSION for $TARGET..."
 curl -fsSL "$URL" | tar xz
@@ -56,7 +42,7 @@ mkdir -p "$INSTALL_DIR"
 mv "$BIN" "$INSTALL_DIR/$BIN"
 chmod +x "$INSTALL_DIR/$BIN"
 
-echo "✓ Installed to $INSTALL_DIR/$BIN"
+echo "Installed to $INSTALL_DIR/$BIN"
 
 if ! echo "$PATH" | tr ':' '\n' | grep -qxF "$INSTALL_DIR"; then
     printf 'note: %s is not in PATH. Add this to your shell profile:\n' "$INSTALL_DIR"
