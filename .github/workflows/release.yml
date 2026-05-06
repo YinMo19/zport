@@ -28,6 +28,9 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: zip
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            ext: zip
 
     runs-on: ${{ matrix.os }}
 
@@ -36,9 +39,9 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Add Rust target (macOS cross-compile to x86_64)
-        if: matrix.target == 'x86_64-apple-darwin'
-        run: rustup target add x86_64-apple-darwin
+      - name: Add Rust target (cross-compile)
+        if: matrix.target == 'x86_64-apple-darwin' || matrix.target == 'aarch64-pc-windows-msvc'
+        run: rustup target add ${{ matrix.target }}
 
       - name: Install cross
         if: matrix.cross
