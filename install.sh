@@ -1,4 +1,5 @@
 #!/bin/sh
+# Install zport: curl -fsSL https://raw.githubusercontent.com/YinMo19/zport/master/install.sh | sh
 set -eu
 
 REPO="YinMo19/zport"
