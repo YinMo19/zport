@@ -162,9 +162,7 @@ pub fn close(host: Option<&str>, local_port: u16) {
 
         // Best-effort: the connection may already be dead, so a failed cancel is not fatal.
         if !c.status().map(|s| s.success()).unwrap_or(false) {
-            eprintln!(
-                "warning: could not cancel on {host} (connection lost?), cleaning up state"
-            );
+            eprintln!("warning: could not cancel on {host} (connection lost?), cleaning up state");
         }
     } else if let Some(pid) = entry.pid() {
         ssh::kill_pid(pid);

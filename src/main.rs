@@ -43,6 +43,13 @@ fn parse_port_spec(spec: &str) -> Option<(u16, Option<u16>)> {
     }
 }
 
+fn looks_like_port_spec(spec: &str) -> bool {
+    spec.chars().all(|c| c.is_ascii_digit())
+        || spec
+            .split_once(':')
+            .is_some_and(|(left, _)| left.chars().all(|c| c.is_ascii_digit()))
+}
+
 // Map positional shorthand to subcommand args: `zport 8080` → `zport forward 8080`.
 fn map_positional(args: &[String]) -> Vec<String> {
     let mut out = vec!["zport".into()];
@@ -50,15 +57,8 @@ fn map_positional(args: &[String]) -> Vec<String> {
     match args.len() {
         1 => {
             let a = &args[0];
-            if a.chars().all(|c| c.is_ascii_digit()) {
+            if looks_like_port_spec(a) {
                 out.push("forward".into());
-                out.push(a.clone());
-            } else if let Some((l, _)) = a.split_once(':') {
-                if l.chars().all(|c| c.is_ascii_digit()) {
-                    out.push("forward".into());
-                } else {
-                    out.push("connect".into());
-                }
                 out.push(a.clone());
             } else {
                 out.push("connect".into());
@@ -66,9 +66,25 @@ fn map_positional(args: &[String]) -> Vec<String> {
             }
         }
         2 => {
-            out.push("forward".into());
-            out.push(args[0].clone());
-            out.push(args[1].clone());
+            let first_is_port = looks_like_port_spec(&args[0]);
+            let second_is_port = looks_like_port_spec(&args[1]);
+
+            match (first_is_port, second_is_port) {
+                (true, false) => {
+                    out.push("forward".into());
+                    out.push(args[0].clone());
+                    out.push(args[1].clone());
+                }
+                (false, true) => {
+                    out.push("forward".into());
+                    out.push(args[1].clone());
+                    out.push(args[0].clone());
+                }
+                _ => {
+                    eprintln!("error: shorthand forward needs one host and one port spec");
+                    std::process::exit(1);
+                }
+            }
         }
         _ => {
             eprintln!("error: too many arguments");
@@ -119,5 +135,62 @@ fn main() {
         Cli::Ls => cmd::list(),
         Cli::Close { local_port, host } => cmd::close(host.as_deref(), local_port),
         Cli::Disconnect { host } => cmd::disconnect(host.as_deref()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::map_positional;
+
+    fn args(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn maps_single_host_to_connect() {
+        assert_eq!(
+            map_positional(&args(&["myhost"])),
+            args(&["zport", "connect", "myhost"])
+        );
+    }
+
+    #[test]
+    fn maps_single_port_to_forward() {
+        assert_eq!(
+            map_positional(&args(&["8080"])),
+            args(&["zport", "forward", "8080"])
+        );
+    }
+
+    #[test]
+    fn maps_single_port_pair_to_forward() {
+        assert_eq!(
+            map_positional(&args(&["5432:5433"])),
+            args(&["zport", "forward", "5432:5433"])
+        );
+    }
+
+    #[test]
+    fn maps_invalid_port_pair_to_forward_for_validation() {
+        assert_eq!(
+            map_positional(&args(&["5432:bad"])),
+            args(&["zport", "forward", "5432:bad"])
+        );
+    }
+
+    #[test]
+    fn maps_port_host_to_forward() {
+        assert_eq!(
+            map_positional(&args(&["3000", "myhost"])),
+            args(&["zport", "forward", "3000", "myhost"])
+        );
+    }
+
+    #[test]
+    fn maps_host_port_to_forward() {
+        assert_eq!(
+            map_positional(&args(&["myhost", "3000"])),
+            args(&["zport", "forward", "3000", "myhost"])
+        );
     }
 }
